@@ -74,6 +74,69 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Disallowed tools - block all write/delete/mutating operations
+# This ensures the autonomous agents are READ-ONLY
+DISALLOWED_TOOLS=(
+  # Google Sheets - write operations
+  "mcp__google-sheets__update_cells"
+  "mcp__google-sheets__batch_update_cells"
+  "mcp__google-sheets__add_rows"
+  "mcp__google-sheets__add_columns"
+  "mcp__google-sheets__copy_sheet"
+  "mcp__google-sheets__rename_sheet"
+  "mcp__google-sheets__create_spreadsheet"
+  "mcp__google-sheets__create_sheet"
+  "mcp__google-sheets__share_spreadsheet"
+  "mcp__google-sheets__batch_update"
+  # Google Docs - write operations
+  "mcp__google-docs__appendToGoogleDoc"
+  "mcp__google-docs__insertText"
+  "mcp__google-docs__deleteRange"
+  "mcp__google-docs__applyTextStyle"
+  "mcp__google-docs__applyParagraphStyle"
+  "mcp__google-docs__insertTable"
+  "mcp__google-docs__editTableCell"
+  "mcp__google-docs__batchEditTableCells"
+  "mcp__google-docs__insertPageBreak"
+  "mcp__google-docs__insertImageFromUrl"
+  "mcp__google-docs__insertLocalImage"
+  "mcp__google-docs__fixListFormatting"
+  "mcp__google-docs__addComment"
+  "mcp__google-docs__replyToComment"
+  "mcp__google-docs__resolveComment"
+  "mcp__google-docs__deleteComment"
+  "mcp__google-docs__formatMatchingText"
+  "mcp__google-docs__createFolder"
+  "mcp__google-docs__moveFile"
+  "mcp__google-docs__copyFile"
+  "mcp__google-docs__renameFile"
+  "mcp__google-docs__deleteFile"
+  "mcp__google-docs__createDocument"
+  "mcp__google-docs__createFromTemplate"
+  "mcp__google-docs__createTab"
+  "mcp__google-docs__deleteTab"
+  "mcp__google-docs__updateTab"
+  # Metabase - write operations
+  "mcp__metabase__create_card"
+  "mcp__metabase__update_card"
+  "mcp__metabase__delete_card"
+  "mcp__metabase__create_dashboard"
+  "mcp__metabase__update_dashboard"
+  "mcp__metabase__delete_dashboard"
+  "mcp__metabase__add_card_to_dashboard"
+  # Notion - write operations
+  "mcp__notion__notion-create-pages"
+  "mcp__notion__notion-update-page"
+  "mcp__notion__notion-move-pages"
+  "mcp__notion__notion-duplicate-page"
+  "mcp__notion__notion-create-database"
+  "mcp__notion__notion-update-database"
+  "mcp__notion__notion-create-comment"
+)
+
+# Join array into comma-separated string
+DISALLOWED_TOOLS_STR=$(IFS=','; echo "${DISALLOWED_TOOLS[*]}")
+
 echo -e "${BLUE}================================================${NC}"
 echo -e "${BLUE}  Analytics Ralph - Analyst/Evaluator Loop${NC}"
 echo -e "${BLUE}  Project: $PROJECT_NAME${NC}"
@@ -140,8 +203,8 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     ANALYST_CONTEXT+=$(cat "$ANALYSIS_FILE")
   fi
 
-  # Run analyst
-  echo -e "$ANALYST_CONTEXT" | claude --dangerously-skip-permissions --print 2>&1 | tee /tmp/analyst_output.txt
+  # Run analyst (with disallowed write tools for safety)
+  echo -e "$ANALYST_CONTEXT" | claude --dangerously-skip-permissions --disallowedTools "$DISALLOWED_TOOLS_STR" --print 2>&1 | tee /tmp/analyst_output.txt
 
   # Log to history
   echo "" >> "$HISTORY_FILE"
@@ -172,8 +235,8 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   EVALUATOR_CONTEXT+=$(cat "$ANALYSIS_FILE")
   EVALUATOR_CONTEXT+="\n\n---\n\nThis is iteration $i of $MAX_ITERATIONS. Please evaluate and write your feedback to $FEEDBACK_FILE."
 
-  # Run evaluator
-  EVAL_OUTPUT=$(echo -e "$EVALUATOR_CONTEXT" | claude --dangerously-skip-permissions --print 2>&1 | tee /tmp/evaluator_output.txt)
+  # Run evaluator (with disallowed write tools for safety)
+  EVAL_OUTPUT=$(echo -e "$EVALUATOR_CONTEXT" | claude --dangerously-skip-permissions --disallowedTools "$DISALLOWED_TOOLS_STR" --print 2>&1 | tee /tmp/evaluator_output.txt)
 
   # Log to history
   echo "" >> "$HISTORY_FILE"
